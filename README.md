@@ -128,6 +128,117 @@ Las capturas se encuentran en `docs/parte1/` y están insertadas en el README **
 | Después de extraer métodos | `03-pruebas-en-verde-después-de-refactorizar-el-metodo.png` | Pruebas verdes; misma batería de caracterización |
 | Después del polimorfismo | `04-pruebas-polimorfismo-verde.png` | Pruebas verdes; misma batería de caracterización |
 
+## Parte 2. Diagnóstico y resolución de acoplamiento entre paquetes
+
+### Paso 1. Incorporación del módulo de reportes
+
+Se incorporó el paquete `reportes` al proyecto existente, implementando la clase `ReporteBajoStockService`, encargada de consultar los productos registrados en el inventario y generar un reporte de aquellos cuyo stock se encuentra por debajo del mínimo establecido.
+
+Para integrar ambos módulos, se extendió `InventarioService` mediante un colaborador opcional configurado por setter, conservando su constructor implícito sin argumentos y la compatibilidad con las pruebas de caracterización de la Parte 1.
+
+#### 1.1. Estructura del módulo de reportes
+
+Se creó el paquete `reportes` dentro de `com.universidad.refactoringu11`, manteniendo el paquete `inventario` desarrollado anteriormente.
+
+![Estructura del módulo de reportes](docs/parte2/02-01-estructura-modulo-reportes.png)
+
+#### 1.2. Implementación de ReporteBajoStockService
+
+Se implementó el método `generarReporte()`, que consulta los productos disponibles y construye un reporte de texto con aquellos cuyo stock es inferior al mínimo definido.
+
+![Implementación de ReporteBajoStockService](docs/parte2/02-01-reporte-bajo-stock-service.png)
+
+#### 1.3. Introducción intencional del acoplamiento
+
+La integración genera dependencias entre los paquetes en ambas direcciones:
+
+- **inventario → reportes:** `InventarioService` utiliza `ReporteBajoStockService` para generar reportes cuando se detecta una condición de bajo stock.
+- **reportes → inventario:** `ReporteBajoStockService` utiliza `InventarioService` y `Producto` para consultar la información del inventario.
+
+Esta estructura introduce intencionalmente un ciclo de dependencias que será diagnosticado mediante ArchUnit.
+
+![Acoplamiento entre inventario y reportes](docs/parte2/02-01-acoplamiento-inventario-reportes.png)
+
+#### 1.4. Verificación funcional
+
+Se ejecutó `mvn test` después de incorporar el módulo de reportes, utilizando las pruebas de caracterización de la Parte 1 sin modificarlas.
+
+La evidencia muestra la ejecución satisfactoria de las pruebas, lo que permite comprobar que la integración no alteró los comportamientos verificados previamente.
+
+![Pruebas funcionales en verde con acoplamiento](docs/parte2/02-01-pruebas-verde-con-acoplamiento.png)
+
+### Paso 2. Diagnóstico del acoplamiento mediante ArchUnit
+
+Se implementó `ArquitecturaPaquetesTest` utilizando ArchUnit 1.3.0, con el objetivo de identificar dependencias cíclicas entre los paquetes del proyecto.
+
+La prueba utiliza la regla `beFreeOfCycles()` para verificar que los paquetes no formen ciclos de dependencia.
+
+#### 2.1. Implementación de la prueba de arquitectura
+
+Se creó `ArquitecturaPaquetesTest.java` dentro de `src/test/java/com/universidad/refactoringu11/`.
+
+Esta prueba analiza las dependencias entre los paquetes del proyecto sin modificar las clases de producción.
+
+![Implementación de ArquitecturaPaquetesTest](docs/parte2/02-02-estructura-prueba-arquitectura.png)
+
+#### 2.2. Diagnóstico de la dependencia cíclica
+
+El diseño incorporado presenta las siguientes dependencias:
+
+- `inventario → reportes`: `InventarioService` importa `ReporteBajoStockService`.
+- `reportes → inventario`: `ReporteBajoStockService` importa `InventarioService` y `Producto`.
+
+Estas dependencias forman un ciclo entre paquetes, debido a que ambos requieren conocer elementos del otro.
+
+**Diagrama de arquitectura antes de la corrección:**
+
+```mermaid
+flowchart LR
+    A["inventario"] --> B["reportes"]
+    B --> A
+```
+
+El acoplamiento bidireccional dificulta la evolución independiente de los módulos y evidencia un problema de diseño que no necesariamente se manifiesta mediante errores funcionales.
+
+#### 2.3. Ejecución de la prueba de arquitectura
+
+Se ejecutó el siguiente comando:
+
+`mvn "-Dtest=ArquitecturaPaquetesTest" test`
+
+La ejecución produjo los siguientes resultados:
+
+| Indicador | Resultado |
+|---|---|
+| Pruebas ejecutadas | 1 |
+| Fallos | 1 |
+| Errores | 0 |
+| Pruebas omitidas | 0 |
+| Estado de compilación Maven | BUILD FAILURE |
+
+El fallo es el resultado esperado para esta etapa. La confirmación de que corresponde específicamente al ciclo debe sustentarse en el detalle de la violación reportada por ArchUnit.
+
+![Resultado BUILD FAILURE de la prueba de arquitectura](docs/parte2/02-02-archunit-build-failure.png)
+
+#### 2.4. Verificación de las pruebas funcionales
+
+Se ejecutaron nuevamente las pruebas de caracterización de `InventarioServiceTest`, `ClasificadorProductoTest` y `EtiquetadoProductoTest`, sin modificar sus implementaciones.
+
+Estas pruebas verifican el comportamiento funcional del inventario de manera independiente de la regla de arquitectura.
+
+Su ejecución satisfactoria demuestra que el sistema puede conservar el comportamiento esperado aun cuando su organización interna presente dependencias no deseadas.
+
+![Pruebas funcionales en verde](docs/parte2/02-02-pruebas-funcionales-en-verde.png)
+
+#### 2.5. Conclusión del diagnóstico
+
+La comparación entre las pruebas funcionales y la prueba de arquitectura permite establecer que un sistema puede compilar correctamente y superar sus pruebas de negocio, sin que esto garantice una arquitectura libre de problemas de diseño.
+
+El ciclo entre `inventario` y `reportes` constituye un problema de acoplamiento bidireccional que aumenta la dependencia entre módulos y dificulta su mantenimiento.
+
+En el siguiente paso se aplicará el principio de Inversión de Dependencias mediante la interfaz `NotificadorBajoStock`, ubicada en el paquete `inventario`, con el propósito de eliminar el ciclo sin modificar el comportamiento observable del sistema.
+
+
 Para verificar el estado local del proyecto:
 
 ```bash
@@ -137,7 +248,5 @@ git status
 ```
 
 
-
-> **Pendiente:** Parte 2 — Diagnóstico de dependencias cíclicas entre paquetes, ArchUnit e inversión de dependencias. Se completará en este mismo `README.md`, sin crear otro repositorio.
 
 
