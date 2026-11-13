@@ -7,18 +7,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 
-
 @Service
 public class InventarioService {
 
     private final List<Producto> productos = new ArrayList<>();
     private final List<String> movimientos = new ArrayList<>();
+    private NotificadorBajoStock notificador;
 
     public void agregarProducto(Producto producto) {
         productos.add(producto);
     }
-
-    private NotificadorBajoStock notificador;
 
     @Autowired(required = false)
     public void setNotificador(@Lazy NotificadorBajoStock notificador) {

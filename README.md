@@ -238,14 +238,203 @@ El ciclo entre `inventario` y `reportes` constituye un problema de acoplamiento 
 
 En el siguiente paso se aplicará el principio de Inversión de Dependencias mediante la interfaz `NotificadorBajoStock`, ubicada en el paquete `inventario`, con el propósito de eliminar el ciclo sin modificar el comportamiento observable del sistema.
 
+### Paso 3. Resolución del ciclo mediante inversión de dependencias
 
-Para verificar el estado local del proyecto:
+Se aplicó el principio de Inversión de Dependencias (DIP) para eliminar el acoplamiento cíclico identificado previamente mediante ArchUnit.
 
-```bash
-mvn test
-git log --oneline -5
-git status
+Para ello, se creó la interfaz `NotificadorBajoStock` dentro del paquete `inventario`, sustituyendo la dependencia directa de `InventarioService` hacia la implementación `ReporteBajoStockService`.
+
+La clase `ReporteBajoStockService`, ubicada en el paquete `reportes`, implementa esta interfaz y mantiene acceso a los componentes del dominio necesarios para consultar el inventario y generar reportes.
+
+#### 3.1. Implementación de la abstracción
+
+La interfaz `NotificadorBajoStock` establece un contrato independiente de las implementaciones concretas mediante el método `notificar(Producto producto, int cantidadReorden)`.
+
+![Interfaz NotificadorBajoStock](docs/parte2/02-03-interfaz-notificador.png)
+
+#### 3.2. Eliminación de la dependencia directa
+
+Se modificó `InventarioService` para que utilice la interfaz `NotificadorBajoStock` en lugar de importar `ReporteBajoStockService`.
+
+De esta manera, el dominio conserva la capacidad de generar eventos de bajo stock sin conocer la implementación responsable de procesarlos.
+
+![InventarioService sin dependencia directa](docs/parte2/02-03-inventario-sin-dependencia.png)
+
+#### 3.3. Decisión de diseño 3: ubicación de NotificadorBajoStock
+
+**Decisión adoptada:** ubicar `NotificadorBajoStock` en el paquete `inventario`.
+
+**Justificación:**
+
+El paquete `inventario` representa el dominio del sistema, pues contiene las entidades y reglas relacionadas con los productos, los movimientos y el control de existencias. Por tanto, constituye el módulo de mayor nivel de abstracción frente al paquete `reportes`.
+
+Por su parte, `reportes` representa un componente de apoyo encargado de consultar y presentar información, cuya implementación depende de las necesidades del dominio.
+
+De acuerdo con el principio de Inversión de Dependencias, los componentes de mayor nivel no deben depender de implementaciones concretas de menor nivel. En su lugar, deben establecer contratos mediante abstracciones.
+
+Por esta razón, la interfaz se ubica en `inventario`, permitiendo que `ReporteBajoStockService` implemente el contrato definido por el dominio.
+
+Esta decisión respeta la regla arquitectónica de que los paquetes de infraestructura dependen del dominio, mientras que el dominio no depende de infraestructura. Asimismo, facilita la sustitución de implementaciones y reduce el acoplamiento entre paquetes.
+
+#### 3.4. Arquitectura después de la corrección
+
+```mermaid
+flowchart LR
+    B["reportes"] --> A["inventario"]
 ```
+
+Después de la refactorización, la dependencia entre paquetes queda orientada exclusivamente desde `reportes` hacia `inventario`, eliminando el ciclo previamente identificado.
+
+#### 3.5. Verificación de arquitectura
+
+Se ejecutó el comando:
+
+`mvn "-Dtest=ArquitecturaPaquetesTest" test`
+
+**Resultado obtenido:**
+
+| Indicador | Resultado |
+|---|---|
+| Pruebas ejecutadas | 1 |
+| Fallos | 0 |
+| Errores | 0 |
+| Pruebas omitidas | 0 |
+| Estado | BUILD SUCCESS |
+
+La ejecución satisfactoria confirma que ArchUnit ya no detecta dependencias cíclicas bajo la regla configurada.
+
+![ArchUnit después de corregir el ciclo](docs/parte2/02-03-archunit-build-success.png)
+
+Adicionalmente, se ejecutó la suite completa para comprobar que la modificación arquitectónica no afectó las pruebas existentes.
+
+![Pruebas completas después de resolver el ciclo](docs/parte2/02-03-pruebas-completas-verde.png)
+
+---
+
+### Paso 4. Verificación de la preservación del comportamiento
+
+Después de resolver la dependencia cíclica, se ejecutaron nuevamente las pruebas de caracterización desarrolladas en la Parte 1, sin modificar sus implementaciones.
+
+El propósito fue comprobar que los cambios realizados sobre la estructura de paquetes no alteraron los resultados funcionales previamente verificados.
+
+#### 4.1. Pruebas de caracterización originales
+
+Se ejecutó:
+
+`mvn "-Dtest=InventarioServiceTest,ClasificadorProductoTest,EtiquetadoProductoTest" test`
+
+Las pruebas verifican los movimientos de inventario, las condiciones de stock insuficiente, las alertas de reorden, los recargos de envío y la generación de etiquetas.
+
+**Resultado: 14 pruebas de caracterización exitosas, sin fallos ni errores.**
+
+![Pruebas de caracterización después de la reestructuración](docs/parte2/02-04-pruebas-caracterizacion-verde.png)
+
+#### 4.2. Ejecución de la suite completa
+
+Posteriormente, se ejecutó `mvn test`, incluyendo las pruebas funcionales, la prueba de arquitectura y la prueba del contexto de Spring Boot.
+
+**Resultados obtenidos:**
+
+| Tipo de prueba | Cantidad |
+|---|---:|
+| InventarioServiceTest | 6 |
+| ClasificadorProductoTest | 4 |
+| EtiquetadoProductoTest | 4 |
+| ArquitecturaPaquetesTest | 1 |
+| RefactoringU11ApplicationTests | 1 |
+| **Total** | **16** |
+
+**Resumen de Maven:** 16 pruebas ejecutadas, 0 fallos, 0 errores, 0 omitidas y `BUILD SUCCESS`.
+
+![Suite completa de pruebas en verde](docs/parte2/02-04-suite-completa-verde.png)
+
+Estos resultados respaldan que la reestructuración conservó el comportamiento cubierto por las pruebas de caracterización y eliminó el ciclo detectado por la prueba de arquitectura.
+
+#### 4.3. Decisión de diseño 4: granularidad de las notificaciones
+
+**Alternativas evaluadas:**
+
+- Notificación por evento individual mediante `notificar(Producto producto, int cantidadReorden)`.
+- Notificación por lote mediante una operación como `notificar(List<Producto> productos)`.
+
+**Decisión adoptada:** utilizar notificaciones individuales por cada evento de bajo stock.
+
+**Justificación:**
+
+El sistema procesa los movimientos de inventario individualmente, por lo que resulta adecuado generar una notificación cuando una operación deja las existencias de un producto por debajo del mínimo establecido.
+
+La notificación individual permite identificar el producto afectado y comunicar directamente la cantidad que debe reordenarse. Asimismo, facilita el registro oportuno de cada alerta sin necesidad de procesar nuevamente todos los productos.
+
+Esta solución mantiene un contrato sencillo entre `InventarioService` y `NotificadorBajoStock`, favoreciendo la separación de responsabilidades y evitando introducir mecanismos de agrupación innecesarios.
+
+Por el contrario, una notificación por lotes sería preferible en escenarios con grandes volúmenes de movimientos, procesos programados o reportes periódicos, donde agrupar múltiples eventos podría reducir operaciones y mejorar la eficiencia.
+
+En consecuencia, la granularidad por evento responde mejor a las necesidades actuales del sistema, sin impedir que en el futuro se implementen mecanismos de procesamiento por lotes.
+
+---
+
+### Paso 5. Consolidación de evidencias y verificación final
+
+Se consolidaron las evidencias de la Parte 2 para documentar el diagnóstico y la corrección del acoplamiento entre paquetes, incluyendo las pruebas de arquitectura antes y después de la refactorización y la conservación del comportamiento funcional.
+
+#### 5.1. Comparación de arquitectura antes y después
+
+**Arquitectura original — Dependencia cíclica**
+
+```mermaid
+flowchart LR
+    A["inventario"] --> B["reportes"]
+    B --> A
+```
+
+**Arquitectura refactorizada — Dependencia invertida**
+
+```mermaid
+flowchart LR
+    B["reportes"] --> A["inventario"]
+```
+
+La arquitectura original presentaba dependencias bidireccionales entre los paquetes. Después de introducir `NotificadorBajoStock` en el dominio, únicamente `reportes` depende de `inventario`.
+
+#### 5.2. Comparación de resultados de ArchUnit
+
+| Indicador | Antes de la corrección | Después de la corrección |
+|---|---|---|
+| Dependencia cíclica | Detectada | No detectada |
+| Pruebas de arquitectura | 1 | 1 |
+| Fallos | 1 | 0 |
+| Errores | 0 | 0 |
+| Resultado de Maven | BUILD FAILURE | BUILD SUCCESS |
+| Dependencia entre paquetes | Bidireccional | Unidireccional |
+
+**Evidencia del diagnóstico inicial:**
+
+![Ciclo detectado por ArchUnit](docs/parte2/02-02-ciclo-detectado-archunit.png)
+
+![Prueba de arquitectura antes de la corrección](docs/parte2/02-02-archunit-build-failure.png)
+
+**Evidencia después de la corrección:**
+
+![Prueba de arquitectura después de la corrección](docs/parte2/02-03-archunit-build-success.png)
+
+#### 5.3. Consolidación de pruebas funcionales
+
+| Verificación | Resultado |
+|---|---|
+| Pruebas de caracterización de la Parte 1 | 14 exitosas |
+| Prueba de arquitectura después de corregir el ciclo | 1 exitosa |
+| Prueba del contexto Spring Boot | 1 exitosa |
+| Suite completa del proyecto | 16 exitosas |
+| Fallos y errores finales | 0 |
+| Resultado final | BUILD SUCCESS |
+
+La comparación demuestra que las pruebas de negocio continuaron siendo exitosas antes y después de la corrección arquitectónica, mientras que la prueba de ArchUnit pasó de detectar un ciclo a verificar su eliminación.
+
+#### 5.4. Conclusión general
+
+La actividad permitió identificar y resolver problemas de diseño mediante refactorización guiada por pruebas, sin alterar los comportamientos verificados previamente. En la Parte 1 se eliminaron los Code Smells Long Method y Switch Statements duplicados mediante Extract Method y polimorfismo, respectivamente. En la Parte 2 se identificó una dependencia cíclica entre `inventario` y `reportes` mediante ArchUnit y se resolvió aplicando el principio de Inversión de Dependencias.
+
+Las cuatro decisiones de diseño documentadas sustentan la selección de las técnicas de refactorización, la ubicación de las abstracciones y la granularidad de las notificaciones. Finalmente, la ejecución satisfactoria de las 16 pruebas demuestra que el sistema conserva los comportamientos verificados y cumple la regla arquitectónica evaluada.
 
 
 
