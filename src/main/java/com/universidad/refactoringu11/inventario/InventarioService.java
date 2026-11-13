@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
-import com.universidad.refactoringu11.reportes.ReporteBajoStockService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+
 
 @Service
 public class InventarioService {
@@ -18,12 +18,11 @@ public class InventarioService {
         productos.add(producto);
     }
 
-    private ReporteBajoStockService reporteBajoStockService;
+    private NotificadorBajoStock notificador;
 
     @Autowired(required = false)
-    public void setReporteBajoStockService(
-            @Lazy ReporteBajoStockService reporteBajoStockService) {
-        this.reporteBajoStockService = reporteBajoStockService;
+    public void setNotificador(@Lazy NotificadorBajoStock notificador) {
+        this.notificador = notificador;
     }
 
     public List<Producto> obtenerProductos() {
@@ -100,8 +99,8 @@ public class InventarioService {
 
         if (nuevoStock < producto.getStockMinimo()) {
 
-            if (reporteBajoStockService != null) {
-                System.out.println(reporteBajoStockService.generarReporte());
+            if (notificador != null) {
+                notificador.notificar(producto, cantidadReorden);
             }
 
             System.out.println("ALERTA: " + producto.getNombre()
