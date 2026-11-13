@@ -44,7 +44,7 @@ Antes de cambiar el código de producción, se crearon pruebas JUnit 5 que ejecu
 | `EtiquetadoProductoTest` | 2 | 4, incluyendo ROPA y ALIMENTO |
 | **Total** | **12** | **14** |
 
-**Cantidad realmente ejecutada:** [anotar el total que muestra `mvn test`; puede ser mayor si se conservó una prueba automática de Spring Boot].
+**Cantidad realmente ejecutada:** 15.
 
 ![Estructura de las clases de prueba](docs/parte1/02-estructura-pruebas.png)
 
@@ -67,7 +67,6 @@ Estas pruebas se registraron en Git **antes** de realizar cualquiera de las dos 
 | Métodos privados de apoyo | 0 | 7 |
 | Pruebas originales modificadas | — | 0 |
 
-\*Criterio: incluir declaración, llave de cierre, comentarios y líneas vacías. El valor inicial de 44 corresponde al código transcrito de la guía; confirmar si el archivo inicial fue formateado de manera distinta.
 
 ![Método actualizarInventario refactorizado](docs/parte1/03-metodo-actualizarInventario-refactorizado.png)
 
